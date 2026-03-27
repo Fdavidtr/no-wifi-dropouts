@@ -37,7 +37,7 @@ class PolicyEngine @Inject constructor(
             if (snapshot.defaultTransport == TransportType.CELLULAR && suggestionsApproved) {
                 val recoverableProfile = enabledProfiles
                     .filterNot { isOnCooldown(it.ssid) }
-                    .maxWithOrNull(compareByDescending<ManagedWifiProfile> { it.priority }.thenByDescending { it.minSignalDbm })
+                    .maxWithOrNull(compareBy<ManagedWifiProfile> { it.priority }.thenBy { it.minSignalDbm })
 
                 if (recoverableProfile != null) {
                     return PolicyDecision.RestoreWifi(
@@ -76,9 +76,9 @@ class PolicyEngine @Inject constructor(
             markCooldown(currentProfile.ssid, 60, now)
             return PolicyDecision.CooldownCurrentWifi(
                 ssid = currentProfile.ssid,
-                reason = "Current Wi-Fi degraded and ${targetCandidate?.ssid} looks stronger.",
+                reason = "Current Wi-Fi degraded and ${targetCandidate.ssid} looks stronger.",
                 cooldownSeconds = 60,
-                targetCandidateSsid = targetCandidate?.ssid,
+                targetCandidateSsid = targetCandidate.ssid,
             )
         }
 

@@ -83,6 +83,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.google.hilt.android)
+    implementation(libs.google.material)
     implementation(libs.google.protobuf.javalite)
     implementation(libs.kotlinx.coroutines.android)
 

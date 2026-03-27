@@ -28,7 +28,7 @@ class MobilityController @Inject constructor(
     private val userPreferencesRepository: io.multinet.mobility.data.preferences.UserPreferencesRepository,
     private val eventLogRepository: EventLogRepository,
     private val policyEngine: io.multinet.mobility.domain.PolicyEngine,
-    @ApplicationScope private val applicationScope: CoroutineScope,
+    @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) {
     private val mutex = Mutex()
     private val restoreJobs = mutableMapOf<String, Job>()
@@ -47,57 +47,59 @@ class MobilityController @Inject constructor(
         }
     }
 
-    suspend fun startMonitoring() = mutex.withLock {
-        if (monitorJob != null) return
+    suspend fun startMonitoring() {
+        mutex.withLock {
+            if (monitorJob != null) return
 
-        refreshCapabilities()
-        connectivityRepository.startMonitoring()
-        wifiSuggestionRepository.startMonitoring()
+            refreshCapabilities()
+            connectivityRepository.startMonitoring()
+            wifiSuggestionRepository.startMonitoring()
 
-        monitorJob = applicationScope.launch {
-            launch {
-                wifiSuggestionRepository.connectionFailures.collect { failure ->
-                    eventLogRepository.log(
-                        category = "wifi_suggestion_failure",
-                        severity = "WARN",
-                        message = failure,
+            monitorJob = applicationScope.launch {
+                launch {
+                    wifiSuggestionRepository.connectionFailures.collect { failure ->
+                        eventLogRepository.log(
+                            category = "wifi_suggestion_failure",
+                            severity = "WARN",
+                            message = failure,
+                        )
+                    }
+                }
+
+                combine(
+                    connectivityRepository.snapshot,
+                    userPreferencesRepository.settingsFlow,
+                    wifiSuggestionRepository.approvalStatus,
+                ) { snapshot, settings, approvalStatus ->
+                    Triple(snapshot, settings, approvalStatus)
+                }.collect { (snapshot, settings, approvalStatus) ->
+                    val cooldowns = policyEngine.currentCooldowns()
+                    _runtimeState.value = _runtimeState.value.copy(
+                        isMonitoring = true,
+                        snapshot = snapshot,
+                        approvalStatus = approvalStatus,
+                        cooldowns = cooldowns,
                     )
+
+                    if (!settings.mobilityModeEnabled) {
+                        return@collect
+                    }
+
+                    val decision = policyEngine.evaluate(
+                        snapshot = snapshot,
+                        profiles = settings.profiles,
+                        candidates = wifiSuggestionRepository.visibleCandidates(),
+                        suggestionsApproved = wifiSuggestionRepository.isApprovalGranted(approvalStatus),
+                    )
+                    applyDecision(decision, settings.profiles)
                 }
             }
 
-            combine(
-                connectivityRepository.snapshot,
-                userPreferencesRepository.settingsFlow,
-                wifiSuggestionRepository.approvalStatus,
-            ) { snapshot, settings, approvalStatus ->
-                Triple(snapshot, settings, approvalStatus)
-            }.collect { (snapshot, settings, approvalStatus) ->
-                val cooldowns = policyEngine.currentCooldowns()
-                _runtimeState.value = _runtimeState.value.copy(
-                    isMonitoring = true,
-                    snapshot = snapshot,
-                    approvalStatus = approvalStatus,
-                    cooldowns = cooldowns,
-                )
-
-                if (!settings.mobilityModeEnabled) {
-                    return@collect
-                }
-
-                val decision = policyEngine.evaluate(
-                    snapshot = snapshot,
-                    profiles = settings.profiles,
-                    candidates = wifiSuggestionRepository.visibleCandidates(),
-                    suggestionsApproved = wifiSuggestionRepository.isApprovalGranted(approvalStatus),
-                )
-                applyDecision(decision, settings.profiles)
-            }
+            eventLogRepository.log(
+                category = "mobility_controller",
+                message = "Mobility monitoring started.",
+            )
         }
-
-        eventLogRepository.log(
-            category = "mobility_controller",
-            message = "Mobility monitoring started.",
-        )
     }
 
     suspend fun stopMonitoring() = mutex.withLock {
@@ -255,4 +257,3 @@ class MobilityController @Inject constructor(
         else -> "Unknown"
     }
 }
-

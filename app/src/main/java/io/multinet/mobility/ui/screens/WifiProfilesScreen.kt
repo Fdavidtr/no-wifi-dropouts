@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -35,7 +34,7 @@ fun WifiProfilesScreen(
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         LazyColumn(
-            modifier = Modifier.weight(1f, fill = true),
+            modifier = Modifier.fillMaxWidth(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -48,7 +47,9 @@ fun WifiProfilesScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .fillMaxWidth(0.72f)
+                                .padding(end = 12.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Text(profile.ssid, style = MaterialTheme.typography.titleMedium)

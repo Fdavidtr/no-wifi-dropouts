@@ -67,7 +67,7 @@ object AppModules {
         context,
         AppDatabase::class.java,
         "multi_net.db",
-    ).fallbackToDestructiveMigration().build()
+    ).fallbackToDestructiveMigration(dropAllTables = true).build()
 
     @Provides
     fun provideEventLogDao(database: AppDatabase): EventLogDao = database.eventLogDao()

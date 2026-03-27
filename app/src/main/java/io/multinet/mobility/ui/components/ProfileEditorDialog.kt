@@ -6,9 +6,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import io.multinet.mobility.domain.ManagedWifiProfile
 import io.multinet.mobility.domain.WifiBandPreference
 import io.multinet.mobility.domain.WifiSecurityType
 
@@ -121,7 +122,7 @@ fun ProfileEditorDialog(
                             .menuAnchor()
                             .fillMaxWidth(),
                     )
-                    ExposedDropdownMenu(
+                    DropdownMenu(
                         expanded = bandMenuExpanded,
                         onDismissRequest = { bandMenuExpanded = false },
                     ) {
@@ -141,7 +142,7 @@ fun ProfileEditorDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.padding(end = 12.dp)) {
                         Text("Permitir fallback a celular", style = MaterialTheme.typography.bodyLarge)
                         Text("Si no hay otra Wi-Fi gestionada mejor.", style = MaterialTheme.typography.bodySmall)
                     }
@@ -152,7 +153,7 @@ fun ProfileEditorDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.padding(end = 12.dp)) {
                         Text("Perfil activo", style = MaterialTheme.typography.bodyLarge)
                         Text("Solo los perfiles activos participan en Mobility Mode.", style = MaterialTheme.typography.bodySmall)
                     }
