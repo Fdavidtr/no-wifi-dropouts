@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+option java_package = "io.multinet.mobility.datastore";
+option java_multiple_files = true;
+
+message MobilitySettings {
+  bool mobility_mode_enabled = 1;
+  bool onboarding_completed = 2;
+  repeated WifiProfile wifi_profiles = 3;
+}
+
+message WifiProfile {
+  string id = 1;
+  string ssid = 2;
+  SecurityType security_type = 3;
+  string encrypted_passphrase = 4;
+  int32 priority = 5;
+  WifiBand preferred_band = 6;
+  int32 min_signal_dbm = 7;
+  bool allow_cell_fallback = 8;
+  bool enabled = 9;
+}
+
+enum SecurityType {
+  SECURITY_TYPE_UNSPECIFIED = 0;
+  SECURITY_TYPE_WPA2 = 1;
+  SECURITY_TYPE_WPA3 = 2;
+}
+
+enum WifiBand {
+  WIFI_BAND_UNSPECIFIED = 0;
+  WIFI_BAND_ANY = 1;
+  WIFI_BAND_2_4_GHZ = 2;
+  WIFI_BAND_5_GHZ = 3;
+  WIFI_BAND_6_GHZ = 4;
+}
+
