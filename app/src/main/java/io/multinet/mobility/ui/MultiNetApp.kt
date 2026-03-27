@@ -126,7 +126,7 @@ fun MultiNetApp(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
-                    text = "Continuidad",
+                    text = "No WiFi Dropouts",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -157,16 +157,16 @@ fun MultiNetApp(
                     contentPadding = PaddingValues(horizontal = 48.dp, vertical = 18.dp),
                 ) {
                     Text(
-                        text = if (uiState.settings.modeEnabled) "Desconectar" else "Conectar",
+                        text = if (uiState.settings.modeEnabled) "Disconnect" else "Connect",
                         style = MaterialTheme.typography.titleMedium,
                     )
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = if (allRuntimePermissionsGranted) {
-                        "Continuidad local Wi-Fi + datos móviles."
+                        "Local Wi-Fi + mobile data continuity."
                     } else {
-                        "Falta acceso a ubicación, Wi-Fi cercana o notificaciones."
+                        "Location, nearby Wi-Fi, or notification access is missing."
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
@@ -242,31 +242,31 @@ private fun DiagnosticsPanel(
             modifier = Modifier.padding(20.dp),
         ) {
             Text(
-                text = "Diagnóstico",
+                text = "Diagnostics",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(modifier = Modifier.height(12.dp))
-            DiagnosticLine("Red por defecto", runtimeState.snapshot.defaultTransport.name)
-            DiagnosticLine("Wi-Fi validada", if (runtimeState.snapshot.validated) "Sí" else "No")
-            DiagnosticLine("Señal Wi-Fi", runtimeState.wifiSignalBucket.name)
-            DiagnosticLine("Estado móvil", runtimeState.cellularWarmupState.name)
+            DiagnosticLine("Default network", runtimeState.snapshot.defaultTransport.name)
+            DiagnosticLine("Wi-Fi validated", if (runtimeState.snapshot.validated) "Yes" else "No")
+            DiagnosticLine("Wi-Fi signal", runtimeState.wifiSignalBucket.name)
+            DiagnosticLine("Mobile state", runtimeState.cellularWarmupState.name)
             DiagnosticLine(
-                "Última transición",
-                runtimeState.lastTransitionAtEpochMillis?.let(::formatTimestamp) ?: "Sin cambios",
+                "Last transition",
+                runtimeState.lastTransitionAtEpochMillis?.let(::formatTimestamp) ?: "No changes",
             )
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider()
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Últimos eventos",
+                text = "Recent events",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Medium,
             )
             Spacer(modifier = Modifier.height(8.dp))
             if (events.isEmpty()) {
                 Text(
-                    text = "Todavía no hay eventos registrados.",
+                    text = "No events recorded yet.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -290,7 +290,7 @@ private fun DiagnosticsPanel(
                 onClick = onHide,
                 modifier = Modifier.align(Alignment.End),
             ) {
-                Text("Ocultar")
+                Text("Hide")
             }
         }
     }
@@ -320,17 +320,17 @@ private fun buildStatusLine(
     allPermissionsGranted: Boolean,
 ): String {
     if (!allPermissionsGranted) {
-        return "Faltan permisos"
+        return "Permissions required"
     }
     if (!modeEnabled) {
-        return "Protección inactiva"
+        return "Protection inactive"
     }
 
     return when {
-        runtimeState.snapshot.defaultTransport == TransportType.CELLULAR -> "En fallback celular"
-        runtimeState.cellularWarmupState == CellularWarmupState.REQUESTING -> "Calentando datos móviles"
+        runtimeState.snapshot.defaultTransport == TransportType.CELLULAR -> "Mobile fallback active"
+        runtimeState.cellularWarmupState == CellularWarmupState.REQUESTING -> "Warming up mobile data"
         runtimeState.cellularWarmupState == CellularWarmupState.UNAVAILABLE -> {
-            "Protección activa · sin respaldo móvil"
+            "Protection active · no mobile backup"
         }
 
         runtimeState.snapshot.defaultTransport == TransportType.WIFI &&
@@ -338,28 +338,28 @@ private fun buildStatusLine(
             !runtimeState.snapshot.dataStallSuspected &&
             runtimeState.wifiSignalBucket != io.multinet.mobility.domain.WifiSignalBucket.WEAK &&
             runtimeState.wifiSignalBucket != io.multinet.mobility.domain.WifiSignalBucket.CRITICAL -> {
-            "Protección activa · Wi-Fi estable"
+            "Protection active · Wi-Fi stable"
         }
 
         runtimeState.cellularWarmupState == CellularWarmupState.AVAILABLE ||
             runtimeState.cellularWarmupState == CellularWarmupState.HOLDING -> {
-            "Protección activa · respaldo listo"
+            "Protection active · backup ready"
         }
 
-        runtimeState.snapshot.defaultTransport == TransportType.NONE -> "Buscando conectividad"
-        else -> "Protección activa · Wi-Fi en riesgo"
+        runtimeState.snapshot.defaultTransport == TransportType.NONE -> "Looking for connectivity"
+        else -> "Protection active · Wi-Fi at risk"
     }
 }
 
 private fun buildNetworkLine(snapshot: ConnectivitySnapshot): String = when (snapshot.defaultTransport) {
     TransportType.WIFI -> {
         val ssid = snapshot.wifiSsid ?: "Wi-Fi"
-        "Red actual: $ssid"
+        "Current network: $ssid"
     }
 
-    TransportType.CELLULAR -> "Red actual: datos móviles"
-    TransportType.NONE -> "Sin red por defecto"
-    else -> "Red actual: ${snapshot.defaultTransport.name.lowercase()}"
+    TransportType.CELLULAR -> "Current network: mobile data"
+    TransportType.NONE -> "No default network"
+    else -> "Current network: ${snapshot.defaultTransport.name.lowercase()}"
 }
 
 private fun formatTimestamp(epochMillis: Long): String = DateTimeFormatter.ofPattern("HH:mm:ss")

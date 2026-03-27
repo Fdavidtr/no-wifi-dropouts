@@ -66,22 +66,22 @@ class ContinuityService : android.app.Service() {
                 val text = when {
                     !runtime.isMonitoring -> getString(R.string.notification_text_idle)
                     runtime.snapshot.defaultTransport == TransportType.CELLULAR -> {
-                        "Fallback móvil activo"
+                        "Mobile fallback active"
                     }
 
                     runtime.cellularWarmupState == CellularWarmupState.REQUESTING -> {
-                        "Calentando datos móviles"
+                        "Warming up mobile data"
                     }
 
                     runtime.cellularWarmupState == CellularWarmupState.AVAILABLE ||
                         runtime.cellularWarmupState == CellularWarmupState.HOLDING -> {
-                        "Respaldo móvil listo"
+                        "Mobile backup ready"
                     }
 
                     runtime.snapshot.defaultTransport == TransportType.WIFI &&
                         runtime.snapshot.validated &&
                         !runtime.snapshot.dataStallSuspected -> {
-                        "Wi-Fi estable"
+                        "Wi-Fi stable"
                     }
 
                     else -> getString(R.string.notification_text_idle)

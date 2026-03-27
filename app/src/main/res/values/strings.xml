@@ -1,7 +1,7 @@
 <resources>
-    <string name="app_name">Multi Net</string>
-    <string name="notification_channel_name">Continuidad local</string>
-    <string name="notification_channel_description">Precalienta datos móviles cuando la Wi-Fi entra en riesgo.</string>
-    <string name="notification_title">Continuidad activa</string>
-    <string name="notification_text_idle">Esperando eventos de red</string>
+    <string name="app_name">No WiFi Dropouts</string>
+    <string name="notification_channel_name">Local continuity</string>
+    <string name="notification_channel_description">Warms up mobile data when Wi-Fi is at risk.</string>
+    <string name="notification_title">Continuity active</string>
+    <string name="notification_text_idle">Waiting for network events</string>
 </resources>

@@ -57,9 +57,9 @@ class MainViewModel @Inject constructor(
             preferencesRepository.setDiagnosticsUnlocked(unlocked)
             _messages.tryEmit(
                 if (unlocked) {
-                    "Diagnóstico avanzado visible."
+                    "Advanced diagnostics visible."
                 } else {
-                    "Diagnóstico avanzado oculto."
+                    "Advanced diagnostics hidden."
                 },
             )
         }
