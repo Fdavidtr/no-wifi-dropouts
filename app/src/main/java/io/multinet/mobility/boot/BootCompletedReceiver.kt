@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import dagger.hilt.android.AndroidEntryPoint
 import io.multinet.mobility.data.preferences.UserPreferencesRepository
-import io.multinet.mobility.service.MobilityModeService
+import io.multinet.mobility.service.ContinuityService
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,8 +22,8 @@ class BootCompletedReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             runCatching {
                 val settings = preferencesRepository.currentSettings()
-                if (settings.mobilityModeEnabled) {
-                    MobilityModeService.start(context)
+                if (settings.modeEnabled) {
+                    ContinuityService.start(context)
                 }
             }
             pendingResult.finish()

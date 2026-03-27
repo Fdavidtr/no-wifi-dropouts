@@ -12,7 +12,6 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import io.multinet.mobility.domain.ConnectivitySnapshot
 import io.multinet.mobility.domain.TransportType
-import io.multinet.mobility.domain.WifiBandPreference
 import java.util.concurrent.Executor
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,7 +23,6 @@ import kotlinx.coroutines.flow.asStateFlow
 class ConnectivityRepository @Inject constructor(
     private val connectivityManager: ConnectivityManager,
     private val connectivityDiagnosticsManager: ConnectivityDiagnosticsManager?,
-    private val wifiManager: WifiManager,
     private val callbackExecutor: Executor,
 ) {
     private val _snapshot = MutableStateFlow(ConnectivitySnapshot())
@@ -32,6 +30,7 @@ class ConnectivityRepository @Inject constructor(
 
     private var registered = false
     private var lastDataStallAtEpochMillis: Long? = null
+    private var currentDefaultNetwork: Network? = null
 
     private val defaultNetworkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -48,6 +47,7 @@ class ConnectivityRepository @Inject constructor(
 
         override fun onLost(network: Network) {
             if (_snapshot.value.currentNetworkId == network.toString()) {
+                currentDefaultNetwork = null
                 _snapshot.value = ConnectivitySnapshot(
                     currentNetworkId = null,
                     defaultTransport = TransportType.NONE,
@@ -96,11 +96,13 @@ class ConnectivityRepository @Inject constructor(
             connectivityDiagnosticsManager?.unregisterConnectivityDiagnosticsCallback(diagnosticsCallback)
         }
         registered = false
+        currentDefaultNetwork = null
     }
 
     @SuppressLint("MissingPermission")
     fun refreshFromNetwork(network: Network?, cachedCapabilities: NetworkCapabilities? = null) {
         if (network == null) {
+            currentDefaultNetwork = null
             _snapshot.value = ConnectivitySnapshot(
                 updatedAtEpochMillis = System.currentTimeMillis(),
                 dataStallSuspected = lastDataStallAtEpochMillis?.let { System.currentTimeMillis() - it <= 15_000 } == true,
@@ -110,6 +112,7 @@ class ConnectivityRepository @Inject constructor(
         }
 
         val capabilities = cachedCapabilities ?: connectivityManager.getNetworkCapabilities(network) ?: return
+        currentDefaultNetwork = network
         val transport = when {
             capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> TransportType.WIFI
             capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> TransportType.CELLULAR
@@ -134,11 +137,17 @@ class ConnectivityRepository @Inject constructor(
             wifiSsid = ssid,
             rssi = wifiInfo?.rssi,
             frequencyMhz = frequency,
-            wifiBand = WifiBandPreference.fromFrequency(frequency),
             dataStallSuspected = lastDataStallAtEpochMillis?.let { System.currentTimeMillis() - it <= 15_000 } == true,
             lastDataStallAtEpochMillis = lastDataStallAtEpochMillis,
             updatedAtEpochMillis = System.currentTimeMillis(),
         )
     }
-}
 
+    fun defaultNetwork(): Network? = currentDefaultNetwork
+
+    fun reportBadConnectivityOnDefaultNetwork(): Result<Boolean> = runCatching {
+        val network = currentDefaultNetwork ?: return@runCatching false
+        connectivityManager.reportNetworkConnectivity(network, false)
+        true
+    }
+}

@@ -10,9 +10,7 @@ data class ConnectivitySnapshot(
     val wifiSsid: String? = null,
     val rssi: Int? = null,
     val frequencyMhz: Int? = null,
-    val wifiBand: WifiBandPreference = WifiBandPreference.ANY,
     val dataStallSuspected: Boolean = false,
     val lastDataStallAtEpochMillis: Long? = null,
     val updatedAtEpochMillis: Long = System.currentTimeMillis(),
 )
-

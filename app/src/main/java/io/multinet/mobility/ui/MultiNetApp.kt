@@ -1,47 +1,58 @@
 package io.multinet.mobility.ui
 
 import android.Manifest
-import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Dns
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.ListAlt
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalInspectionMode
-import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import io.multinet.mobility.domain.ManagedWifiProfile
-import io.multinet.mobility.service.MobilityModeService
-import io.multinet.mobility.ui.components.ProfileEditorDialog
-import io.multinet.mobility.ui.navigation.MainTab
-import io.multinet.mobility.ui.screens.DashboardScreen
-import io.multinet.mobility.ui.screens.EventLogScreen
-import io.multinet.mobility.ui.screens.OnboardingScreen
-import io.multinet.mobility.ui.screens.WifiProfilesScreen
-import kotlinx.coroutines.launch
+import io.multinet.mobility.data.db.EventLogEntry
+import io.multinet.mobility.domain.CellularWarmupState
+import io.multinet.mobility.domain.ContinuityRuntimeState
+import io.multinet.mobility.domain.ConnectivitySnapshot
+import io.multinet.mobility.domain.TransportType
+import io.multinet.mobility.service.ContinuityService
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun MultiNetApp(
@@ -49,12 +60,8 @@ fun MultiNetApp(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val inspectionMode = LocalInspectionMode.current
-    var selectedTab by rememberSaveable { mutableStateOf(MainTab.DASHBOARD) }
-    var editingProfile by remember { mutableStateOf<ManagedWifiProfile?>(null) }
-    var showProfileDialog by remember { mutableStateOf(false) }
+    var pendingConnect by rememberSaveable { mutableStateOf(false) }
 
     val runtimePermissions = remember {
         buildList {
@@ -66,12 +73,21 @@ fun MultiNetApp(
         }.toTypedArray()
     }
 
+    val allRuntimePermissionsGranted = runtimePermissions.all { permission ->
+        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
-    ) { }
-
-    val allRuntimePermissionsGranted = runtimePermissions.all { permission ->
-        ContextCompat.checkSelfPermission(context, permission) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    ) {
+        val granted = runtimePermissions.all { permission ->
+            ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        }
+        if (granted && pendingConnect) {
+            viewModel.markIntroCompleted()
+            ContinuityService.start(context)
+        }
+        pendingConnect = false
     }
 
     LaunchedEffect(Unit) {
@@ -80,119 +96,272 @@ fun MultiNetApp(
         }
     }
 
-    val approvalLabel = when (uiState.runtime.approvalStatus) {
-        android.net.wifi.WifiManager.STATUS_SUGGESTION_APPROVAL_APPROVED_BY_USER -> "Approved"
-        android.net.wifi.WifiManager.STATUS_SUGGESTION_APPROVAL_APPROVED_BY_CARRIER_PRIVILEGE -> "Carrier approved"
-        android.net.wifi.WifiManager.STATUS_SUGGESTION_APPROVAL_PENDING -> "Pending"
-        android.net.wifi.WifiManager.STATUS_SUGGESTION_APPROVAL_REJECTED_BY_USER -> "Rejected"
-        else -> "Unknown"
-    }
-
-    if (showProfileDialog) {
-        ProfileEditorDialog(
-            existingProfile = editingProfile,
-            onDismiss = {
-                editingProfile = null
-                showProfileDialog = false
-            },
-            onSave = { ssid, passphrase, securityType, priority, preferredBand, minSignalDbm, allowCellFallback, enabled ->
-                viewModel.saveProfile(
-                    existingProfile = editingProfile,
-                    ssid = ssid,
-                    passphrase = passphrase,
-                    securityType = securityType,
-                    priority = priority,
-                    preferredBand = preferredBand,
-                    minSignalDbm = minSignalDbm,
-                    allowCellFallback = allowCellFallback,
-                    enabled = enabled,
-                )
-                editingProfile = null
-                showProfileDialog = false
-            },
+    val statusLine = remember(uiState, allRuntimePermissionsGranted) {
+        buildStatusLine(
+            runtimeState = uiState.runtime,
+            modeEnabled = uiState.settings.modeEnabled,
+            allPermissionsGranted = allRuntimePermissionsGranted,
         )
     }
-
-    if (!uiState.settings.onboardingCompleted) {
-        OnboardingScreen(
-            hasRuntimePermissions = allRuntimePermissionsGranted || inspectionMode,
-            profileCount = uiState.settings.profiles.size,
-            approvalLabel = approvalLabel,
-            onRequestPermissions = {
-                if (!inspectionMode) {
-                    permissionLauncher.launch(runtimePermissions)
-                }
-            },
-            onOpenWifiSettings = {
-                context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            },
-            onAddProfile = {
-                editingProfile = null
-                showProfileDialog = true
-            },
-        )
-        return
+    val networkLine = remember(uiState.runtime.snapshot) {
+        buildNetworkLine(uiState.runtime.snapshot)
     }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = selectedTab == MainTab.DASHBOARD,
-                    onClick = { selectedTab = MainTab.DASHBOARD },
-                    icon = { Icon(Icons.Outlined.Home, contentDescription = null) },
-                    label = { Text(MainTab.DASHBOARD.title) },
-                )
-                NavigationBarItem(
-                    selected = selectedTab == MainTab.PROFILES,
-                    onClick = { selectedTab = MainTab.PROFILES },
-                    icon = { Icon(Icons.Outlined.Dns, contentDescription = null) },
-                    label = { Text(MainTab.PROFILES.title) },
-                )
-                NavigationBarItem(
-                    selected = selectedTab == MainTab.EVENTS,
-                    onClick = { selectedTab = MainTab.EVENTS },
-                    icon = { Icon(Icons.Outlined.ListAlt, contentDescription = null) },
-                    label = { Text(MainTab.EVENTS.title) },
-                )
-            }
-        },
     ) { paddingValues ->
-        androidx.compose.foundation.layout.Box(modifier = Modifier.padding(paddingValues)) {
-            when (selectedTab) {
-                MainTab.DASHBOARD -> DashboardScreen(
-                    runtimeState = uiState.runtime,
-                    mobilityModeEnabled = uiState.settings.mobilityModeEnabled,
-                    approvalLabel = approvalLabel,
-                    onToggleMobilityMode = { enabled ->
-                        scope.launch {
-                            if (enabled) {
-                                MobilityModeService.start(context)
-                            } else {
-                                MobilityModeService.stop(context)
-                            }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = "Continuidad",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                StatusCard(
+                    statusLine = statusLine,
+                    networkLine = networkLine,
+                    diagnosticsUnlocked = uiState.settings.diagnosticsUnlocked,
+                    onUnlockDiagnostics = {
+                        if (!uiState.settings.diagnosticsUnlocked) {
+                            viewModel.setDiagnosticsUnlocked(true)
                         }
                     },
                 )
-
-                MainTab.PROFILES -> WifiProfilesScreen(
-                    profiles = uiState.settings.profiles,
-                    onAddProfile = {
-                        editingProfile = null
-                        showProfileDialog = true
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = {
+                        if (uiState.settings.modeEnabled) {
+                            ContinuityService.stop(context)
+                        } else if (!allRuntimePermissionsGranted) {
+                            pendingConnect = true
+                            permissionLauncher.launch(runtimePermissions)
+                        } else {
+                            viewModel.markIntroCompleted()
+                            ContinuityService.start(context)
+                        }
                     },
-                    onEditProfile = { profile ->
-                        editingProfile = profile
-                        showProfileDialog = true
+                    contentPadding = PaddingValues(horizontal = 48.dp, vertical = 18.dp),
+                ) {
+                    Text(
+                        text = if (uiState.settings.modeEnabled) "Desconectar" else "Conectar",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = if (allRuntimePermissionsGranted) {
+                        "Continuidad local Wi-Fi + datos móviles."
+                    } else {
+                        "Falta acceso a ubicación, Wi-Fi cercana o notificaciones."
                     },
-                    onToggleProfile = viewModel::toggleProfile,
-                    onDeleteProfile = viewModel::removeProfile,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                MainTab.EVENTS -> EventLogScreen(events = uiState.events)
+                if (uiState.settings.diagnosticsUnlocked) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    DiagnosticsPanel(
+                        runtimeState = uiState.runtime,
+                        events = uiState.events,
+                        onHide = { viewModel.setDiagnosticsUnlocked(false) },
+                    )
+                }
             }
         }
     }
 }
+
+@Composable
+private fun StatusCard(
+    statusLine: String,
+    networkLine: String,
+    diagnosticsUnlocked: Boolean,
+    onUnlockDiagnostics: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(diagnosticsUnlocked) {
+                detectTapGestures(
+                    onLongPress = {
+                        if (!diagnosticsUnlocked) {
+                            onUnlockDiagnostics()
+                        }
+                    },
+                )
+            },
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = statusLine,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = networkLine,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticsPanel(
+    runtimeState: ContinuityRuntimeState,
+    events: List<EventLogEntry>,
+    onHide: () -> Unit,
+) {
+    Surface(
+        tonalElevation = 2.dp,
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+        ) {
+            Text(
+                text = "Diagnóstico",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            DiagnosticLine("Red por defecto", runtimeState.snapshot.defaultTransport.name)
+            DiagnosticLine("Wi-Fi validada", if (runtimeState.snapshot.validated) "Sí" else "No")
+            DiagnosticLine("Señal Wi-Fi", runtimeState.wifiSignalBucket.name)
+            DiagnosticLine("Estado móvil", runtimeState.cellularWarmupState.name)
+            DiagnosticLine(
+                "Última transición",
+                runtimeState.lastTransitionAtEpochMillis?.let(::formatTimestamp) ?: "Sin cambios",
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Últimos eventos",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            if (events.isEmpty()) {
+                Text(
+                    text = "Todavía no hay eventos registrados.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                events.forEach { event ->
+                    Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                        Text(
+                            text = "${formatTimestamp(event.timestampEpochMillis)} · ${event.category}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = event.message,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(
+                onClick = onHide,
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                Text("Ocultar")
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticLine(
+    label: String,
+    value: String,
+) {
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+private fun buildStatusLine(
+    runtimeState: ContinuityRuntimeState,
+    modeEnabled: Boolean,
+    allPermissionsGranted: Boolean,
+): String {
+    if (!allPermissionsGranted) {
+        return "Faltan permisos"
+    }
+    if (!modeEnabled) {
+        return "Protección inactiva"
+    }
+
+    return when {
+        runtimeState.snapshot.defaultTransport == TransportType.CELLULAR -> "En fallback celular"
+        runtimeState.cellularWarmupState == CellularWarmupState.REQUESTING -> "Calentando datos móviles"
+        runtimeState.cellularWarmupState == CellularWarmupState.UNAVAILABLE -> {
+            "Protección activa · sin respaldo móvil"
+        }
+
+        runtimeState.snapshot.defaultTransport == TransportType.WIFI &&
+            runtimeState.snapshot.validated &&
+            !runtimeState.snapshot.dataStallSuspected &&
+            runtimeState.wifiSignalBucket != io.multinet.mobility.domain.WifiSignalBucket.WEAK &&
+            runtimeState.wifiSignalBucket != io.multinet.mobility.domain.WifiSignalBucket.CRITICAL -> {
+            "Protección activa · Wi-Fi estable"
+        }
+
+        runtimeState.cellularWarmupState == CellularWarmupState.AVAILABLE ||
+            runtimeState.cellularWarmupState == CellularWarmupState.HOLDING -> {
+            "Protección activa · respaldo listo"
+        }
+
+        runtimeState.snapshot.defaultTransport == TransportType.NONE -> "Buscando conectividad"
+        else -> "Protección activa · Wi-Fi en riesgo"
+    }
+}
+
+private fun buildNetworkLine(snapshot: ConnectivitySnapshot): String = when (snapshot.defaultTransport) {
+    TransportType.WIFI -> {
+        val ssid = snapshot.wifiSsid ?: "Wi-Fi"
+        "Red actual: $ssid"
+    }
+
+    TransportType.CELLULAR -> "Red actual: datos móviles"
+    TransportType.NONE -> "Sin red por defecto"
+    else -> "Red actual: ${snapshot.defaultTransport.name.lowercase()}"
+}
+
+private fun formatTimestamp(epochMillis: Long): String = DateTimeFormatter.ofPattern("HH:mm:ss")
+    .withZone(ZoneId.systemDefault())
+    .format(Instant.ofEpochMilli(epochMillis))

@@ -1,8 +1,7 @@
 <resources>
     <string name="app_name">Multi Net</string>
-    <string name="notification_channel_name">Mobility Mode</string>
-    <string name="notification_channel_description">Supervisa la conectividad del dispositivo y ajusta las Wi-Fi gestionadas.</string>
-    <string name="notification_title">Mobility Mode activo</string>
+    <string name="notification_channel_name">Continuidad local</string>
+    <string name="notification_channel_description">Precalienta datos móviles cuando la Wi-Fi entra en riesgo.</string>
+    <string name="notification_title">Continuidad activa</string>
     <string name="notification_text_idle">Esperando eventos de red</string>
 </resources>
-

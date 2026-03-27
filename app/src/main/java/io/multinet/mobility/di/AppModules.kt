@@ -3,7 +3,6 @@ package io.multinet.mobility.di
 import android.content.Context
 import android.net.ConnectivityDiagnosticsManager
 import android.net.ConnectivityManager
-import android.net.wifi.WifiManager
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.dataStoreFile
@@ -52,12 +51,6 @@ object AppModules {
     fun provideConnectivityDiagnosticsManager(
         @ApplicationContext context: Context,
     ): ConnectivityDiagnosticsManager? = context.getSystemService(ConnectivityDiagnosticsManager::class.java)
-
-    @Provides
-    @Singleton
-    fun provideWifiManager(
-        @ApplicationContext context: Context,
-    ): WifiManager = context.getSystemService(WifiManager::class.java)
 
     @Provides
     @Singleton
