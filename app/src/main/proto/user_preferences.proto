@@ -10,6 +10,7 @@ message MobilitySettings {
   reserved "wifi_profiles";
   CellularPolicy cellular_policy = 4;
   bool diagnostics_unlocked = 5;
+  bool legacy_enabled_state_migrated = 6;
 }
 
 enum CellularPolicy {
