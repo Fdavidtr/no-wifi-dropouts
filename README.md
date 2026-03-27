@@ -61,6 +61,10 @@ Local validation completed:
 ./gradlew assembleDebug
 ```
 
+It was also tested on my own Android phone. The improvement was limited, which ended up being one of the main takeaways of the project: Android puts real constraints on how much a normal app can influence Wi-Fi-to-mobile fallback behavior.
+
+That was still valuable. The project worked well as a learning exercise in Android connectivity, system callbacks, foreground services, permissions, and the practical limits of public networking APIs.
+
 ## Next steps
 
 - Test on more real devices and compare OEM behavior
