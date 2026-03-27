@@ -37,7 +37,7 @@ class PolicyEngine @Inject constructor(
             if (snapshot.defaultTransport == TransportType.CELLULAR && suggestionsApproved) {
                 val recoverableProfile = enabledProfiles
                     .filterNot { isOnCooldown(it.ssid) }
-                    .maxWithOrNull(compareBy<ManagedWifiProfile> { it.priority }.thenByDescending { it.minSignalDbm })
+                    .maxWithOrNull(compareByDescending<ManagedWifiProfile> { it.priority }.thenByDescending { it.minSignalDbm })
 
                 if (recoverableProfile != null) {
                     return PolicyDecision.RestoreWifi(
@@ -126,4 +126,3 @@ class PolicyEngine @Inject constructor(
         cooldowns.entries.removeAll { (_, until) -> !until.isAfter(now) }
     }
 }
-
