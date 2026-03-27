@@ -65,6 +65,16 @@ It was also tested on my own Android phone. The improvement was limited, which e
 
 That was still valuable. The project worked well as a learning exercise in Android connectivity, system callbacks, foreground services, permissions, and the practical limits of public networking APIs.
 
+## Built with AI collaboration
+
+This project was developed in synergy with AI.
+
+AI was useful for fast iteration, architecture exploration, naming, documentation, and implementation speed. The main value was not just code generation, but the ability to challenge assumptions quickly, try different technical directions, and document tradeoffs while building.
+
+The process was still hands-on: ideas had to be narrowed, Android constraints had to be validated, the product scope had to be corrected several times, and the final framing had to stay honest about what a normal Android app can and cannot do.
+
+In practice, the project became both a connectivity experiment and an exercise in human + AI collaboration during product and engineering work.
+
 ## Next steps
 
 - Test on more real devices and compare OEM behavior
