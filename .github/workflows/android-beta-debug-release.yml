@@ -53,6 +53,15 @@ jobs:
           mkdir -p dist
           cp app/build/outputs/apk/debug/app-debug.apk "dist/$APK_NAME"
 
+      - name: Ensure beta release does not already exist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists."
+            exit 1
+          fi
+
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v6
         with:
