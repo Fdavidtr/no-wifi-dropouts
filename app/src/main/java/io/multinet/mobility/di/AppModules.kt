@@ -14,6 +14,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.multinet.mobility.data.db.AppDatabase
 import io.multinet.mobility.data.db.EventLogDao
+import io.multinet.mobility.data.db.SignalSampleDao
 import io.multinet.mobility.data.preferences.UserPreferencesMigration
 import io.multinet.mobility.data.preferences.UserPreferencesSerializer
 import io.multinet.mobility.datastore.MobilitySettings
@@ -66,6 +67,9 @@ object AppModules {
 
     @Provides
     fun provideEventLogDao(database: AppDatabase): EventLogDao = database.eventLogDao()
+
+    @Provides
+    fun provideSignalSampleDao(database: AppDatabase): SignalSampleDao = database.signalSampleDao()
 
     @Provides
     @Singleton

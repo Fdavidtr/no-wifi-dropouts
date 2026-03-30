@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.multinet.mobility.data.ContinuityController
 import io.multinet.mobility.data.EventLogRepository
+import io.multinet.mobility.data.SignalHistoryRepository
 import io.multinet.mobility.data.preferences.UserPreferencesRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -20,6 +21,7 @@ class MainViewModel @Inject constructor(
     private val preferencesRepository: UserPreferencesRepository,
     private val continuityController: ContinuityController,
     private val eventLogRepository: EventLogRepository,
+    private val signalHistoryRepository: SignalHistoryRepository,
 ) : ViewModel() {
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val messages = _messages.asSharedFlow()
@@ -28,11 +30,13 @@ class MainViewModel @Inject constructor(
         preferencesRepository.settingsFlow,
         continuityController.runtimeState,
         eventLogRepository.observeRecent(limit = 20),
-    ) { settings, runtime, events ->
+        signalHistoryRepository.observeRecent(limit = 180),
+    ) { settings, runtime, events, signalSamples ->
         MainUiState(
             settings = settings,
             runtime = runtime,
             events = events,
+            signalSamples = signalSamples,
         )
     }.stateIn(
         scope = viewModelScope,
