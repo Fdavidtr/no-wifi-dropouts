@@ -3,6 +3,8 @@ package io.multinet.mobility.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -13,10 +15,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +33,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.multinet.mobility.data.db.EventLogEntry
 import io.multinet.mobility.data.db.SignalSampleEntry
@@ -59,89 +64,119 @@ fun SignalHistoryChart(
     val guideColor = MaterialTheme.colorScheme.outlineVariant
     val thresholdColor = MaterialTheme.colorScheme.tertiary
     val signalColor = MaterialTheme.colorScheme.primary
+    val scrollState = rememberScrollState()
     Column {
         BoxWithConstraints(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(220.dp),
+                .fillMaxWidth(),
         ) {
-            val widthPx = with(density) { maxWidth.toPx() }
-            val heightPx = with(density) { maxHeight.toPx() }
-            val markerRadiusPx = with(density) { 6.dp.toPx() }
-
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val signalPath = Path()
-                val thresholdPath = Path()
-                chartModel.samples.forEachIndexed { index, sample ->
-                    val point = chartModel.toOffset(
-                        width = size.width,
-                        height = size.height,
-                        timestamp = sample.timestampEpochMillis,
-                        rssi = sample.rssi,
-                    )
-                    val thresholdPoint = chartModel.toOffset(
-                        width = size.width,
-                        height = size.height,
-                        timestamp = sample.timestampEpochMillis,
-                        rssi = sample.thresholdRssi,
-                    )
-
-                    if (index == 0) {
-                        signalPath.moveTo(point.x, point.y)
-                        thresholdPath.moveTo(thresholdPoint.x, thresholdPoint.y)
-                    } else {
-                        signalPath.lineTo(point.x, point.y)
-                        thresholdPath.lineTo(thresholdPoint.x, thresholdPoint.y)
-                    }
-                }
-
-                repeat(3) { index ->
-                    val y = size.height * (index / 2f)
-                    drawLine(
-                        color = guideColor,
-                        start = Offset(0f, y),
-                        end = Offset(size.width, y),
-                        strokeWidth = 1.dp.toPx(),
-                    )
-                }
-
-                drawPath(
-                    path = thresholdPath,
-                    color = thresholdColor,
-                    style = Stroke(
-                        width = 2.dp.toPx(),
-                        cap = StrokeCap.Round,
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)),
-                    ),
-                )
-                drawPath(
-                    path = signalPath,
-                    color = signalColor,
-                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
+            val chartWidth = remember(maxWidth, chartModel.samples.size) {
+                maxOf(
+                    maxWidth,
+                    minChartWidth(sampleCount = chartModel.samples.size),
                 )
             }
+            val widthPx = with(density) { chartWidth.toPx() }
+            val heightPx = with(density) { 220.dp.toPx() }
+            val markerRadiusPx = with(density) { 6.dp.toPx() }
 
-            chartModel.markers.forEach { marker ->
-                val offset = chartModel.toOffset(
-                    width = widthPx,
-                    height = heightPx,
-                    timestamp = marker.timestampEpochMillis,
-                    rssi = marker.markerRssi,
-                )
-                val isSelected = marker.event.id == selectedEventId
+            LaunchedEffect(chartModel.maxTimestamp, chartWidth) {
+                scrollState.scrollTo(scrollState.maxValue)
+            }
 
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(scrollState),
+            ) {
                 Box(
                     modifier = Modifier
-                        .offset {
-                            IntOffset(
-                                x = (offset.x - markerRadiusPx).roundToInt(),
-                                y = (offset.y - markerRadiusPx).roundToInt(),
+                        .width(chartWidth)
+                        .height(220.dp),
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val signalPath = Path()
+                        val thresholdPath = Path()
+                        chartModel.samples.forEachIndexed { index, sample ->
+                            val point = chartModel.toOffset(
+                                width = size.width,
+                                height = size.height,
+                                timestamp = sample.timestampEpochMillis,
+                                rssi = sample.rssi,
+                            )
+                            val thresholdPoint = chartModel.toOffset(
+                                width = size.width,
+                                height = size.height,
+                                timestamp = sample.timestampEpochMillis,
+                                rssi = sample.thresholdRssi,
+                            )
+
+                            if (index == 0) {
+                                signalPath.moveTo(point.x, point.y)
+                                thresholdPath.moveTo(thresholdPoint.x, thresholdPoint.y)
+                            } else {
+                                signalPath.lineTo(point.x, point.y)
+                                thresholdPath.lineTo(thresholdPoint.x, thresholdPoint.y)
+                            }
+                        }
+
+                        repeat(3) { index ->
+                            val y = size.height * (index / 2f)
+                            drawLine(
+                                color = guideColor,
+                                start = Offset(0f, y),
+                                end = Offset(size.width, y),
+                                strokeWidth = 1.dp.toPx(),
                             )
                         }
-                        .size(if (isSelected) 14.dp else 12.dp)
-                        .clip(CircleShape)
-                        .background(markerColor(marker.event.severity, isSelected))
-                        .clickable { onEventSelected(marker.event) },
+
+                        drawPath(
+                            path = thresholdPath,
+                            color = thresholdColor,
+                            style = Stroke(
+                                width = 2.dp.toPx(),
+                                cap = StrokeCap.Round,
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)),
+                            ),
+                        )
+                        drawPath(
+                            path = signalPath,
+                            color = signalColor,
+                            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
+                        )
+                    }
+
+                    chartModel.markers.forEach { marker ->
+                        val offset = chartModel.toOffset(
+                            width = widthPx,
+                            height = heightPx,
+                            timestamp = marker.timestampEpochMillis,
+                            rssi = marker.markerRssi,
+                        )
+                        val isSelected = marker.event.id == selectedEventId
+
+                        Box(
+                            modifier = Modifier
+                                .offset {
+                                    IntOffset(
+                                        x = (offset.x - markerRadiusPx).roundToInt(),
+                                        y = (offset.y - markerRadiusPx).roundToInt(),
+                                    )
+                                }
+                                .size(if (isSelected) 14.dp else 12.dp)
+                                .clip(CircleShape)
+                                .background(markerColor(marker.event.severity, isSelected))
+                                .clickable { onEventSelected(marker.event) },
+                        )
+                    }
+                }
+            }
+            if (chartWidth > maxWidth) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Scroll horizontally to inspect older samples.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -193,6 +228,11 @@ private fun LegendDot(
             .clip(CircleShape)
             .background(color),
     )
+}
+
+private fun minChartWidth(sampleCount: Int): Dp {
+    val minimumSampleCount = max(sampleCount - 1, 0)
+    return 160.dp + (minimumSampleCount * 14).dp
 }
 
 private fun markerColor(
