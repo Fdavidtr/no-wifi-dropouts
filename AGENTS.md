@@ -4,6 +4,7 @@
 
 - Target build environment is Android SDK plus JDK `17`. Do not document or validate the app against Java 8.
 - Start every change from a dedicated git branch named `feat/...` or `fix/...`; do not develop directly on `master`.
+- Always create new `feat/...` and `fix/...` branches from the current `master` branch unless the user explicitly asks for a different base.
 - Use `fix/...` for bug fixes and regressions. Use `feat/...` for feature work, documentation updates, and workflow changes.
 - Publish completed work through a GitHub pull request.
 - Prefer small scoped changes. Do not mix feature work with broad cleanup.
