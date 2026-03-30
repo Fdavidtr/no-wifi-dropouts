@@ -41,6 +41,13 @@ Core Android APIs used:
 - `reportNetworkConnectivity(..., false)`
 - foreground service + runtime permissions
 
+## Build requirements
+
+- JDK 17
+- Android SDK configured for the versions declared in the Gradle files
+
+This project is built with AGP 8.x, Kotlin 2.x, and Java 17 bytecode targets, so Java 8 is not a supported build runtime.
+
 ## Why this project is interesting
 
 Most connectivity ideas become nonsense as soon as they hit real Android constraints.

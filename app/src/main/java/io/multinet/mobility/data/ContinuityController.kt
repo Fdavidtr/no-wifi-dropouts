@@ -29,6 +29,7 @@ class ContinuityController @Inject constructor(
     private val cellularWarmupRepository: CellularWarmupRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val eventLogRepository: EventLogRepository,
+    private val signalHistoryRepository: SignalHistoryRepository,
     private val policyEngine: ContinuityPolicyEngine,
     @param:ApplicationScope private val applicationScope: CoroutineScope,
 ) {
@@ -36,6 +37,7 @@ class ContinuityController @Inject constructor(
     private var monitorJob: Job? = null
     private var lastDecisionLogKey: String? = null
     private var lastWarmupState: CellularWarmupState? = null
+    private var signalSampleState = SignalSampleState()
 
     private val _runtimeState = MutableStateFlow(
         ContinuityRuntimeState(
@@ -66,6 +68,8 @@ class ContinuityController @Inject constructor(
                 ) { snapshot, settings, warmupState ->
                     Triple(snapshot, settings, warmupState)
                 }.collect { (snapshot, settings, warmupState) ->
+                    recordSignalSampleIfNeeded(snapshot)
+
                     if (!settings.modeEnabled && warmupState != CellularWarmupState.IDLE) {
                         cellularWarmupRepository.release()
                     }
@@ -84,6 +88,7 @@ class ContinuityController @Inject constructor(
                         applyDecision(snapshot, decision)
                     }
 
+                    logNetworkTransitionIfNeeded(snapshot)
                     logWarmupTransitionIfNeeded(warmupState)
                     publishRuntimeState(
                         settings = settings,
@@ -108,6 +113,7 @@ class ContinuityController @Inject constructor(
         connectivityRepository.stopMonitoring()
         lastDecisionLogKey = null
         lastWarmupState = CellularWarmupState.IDLE
+        signalSampleState = SignalSampleState()
         _runtimeState.update { current ->
             current.copy(
                 modeEnabled = false,
@@ -121,6 +127,36 @@ class ContinuityController @Inject constructor(
         eventLogRepository.log(
             category = "continuity_controller",
             message = "Continuity monitoring stopped.",
+        )
+    }
+
+    private suspend fun recordSignalSampleIfNeeded(snapshot: ConnectivitySnapshot) {
+        val decision = ContinuityDiagnosticsLogic.evaluateSignalSample(
+            snapshot = snapshot,
+            previousState = signalSampleState,
+        )
+        signalSampleState = decision.updatedState
+
+        if (!decision.shouldRecord) return
+
+        signalHistoryRepository.record(
+            snapshot = snapshot,
+            thresholdRssi = checkNotNull(decision.thresholdRssi),
+            bucket = decision.bucket,
+        )
+    }
+
+    private suspend fun logNetworkTransitionIfNeeded(snapshot: ConnectivitySnapshot) {
+        val logEvent = ContinuityDiagnosticsLogic.buildNetworkTransitionLogEvent(
+            previous = _runtimeState.value.snapshot,
+            current = snapshot,
+        ) ?: return
+
+        eventLogRepository.log(
+            category = "network_transition",
+            message = logEvent.message,
+            severity = logEvent.severity,
+            ssid = logEvent.ssid,
         )
     }
 
@@ -252,4 +288,5 @@ class ContinuityController @Inject constructor(
             )
         }
     }
+
 }

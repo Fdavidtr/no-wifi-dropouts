@@ -6,6 +6,5 @@
 /captures/
 /.kotlin/
 app/build/
-app/schemas/
 
 /app/build/outputs/apk/

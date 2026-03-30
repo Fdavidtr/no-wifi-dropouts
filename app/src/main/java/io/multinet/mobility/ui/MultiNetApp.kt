@@ -45,6 +45,7 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.multinet.mobility.data.db.EventLogEntry
+import io.multinet.mobility.data.db.SignalSampleEntry
 import io.multinet.mobility.domain.CellularWarmupState
 import io.multinet.mobility.domain.ContinuityRuntimeState
 import io.multinet.mobility.domain.ConnectivitySnapshot
@@ -178,6 +179,7 @@ fun MultiNetApp(
                     DiagnosticsPanel(
                         runtimeState = uiState.runtime,
                         events = uiState.events,
+                        signalSamples = uiState.signalSamples,
                         onHide = { viewModel.setDiagnosticsUnlocked(false) },
                     )
                 }
@@ -231,8 +233,14 @@ private fun StatusCard(
 private fun DiagnosticsPanel(
     runtimeState: ContinuityRuntimeState,
     events: List<EventLogEntry>,
+    signalSamples: List<SignalSampleEntry>,
     onHide: () -> Unit,
 ) {
+    var selectedEventId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val selectedEvent = remember(selectedEventId, events) {
+        events.firstOrNull { it.id == selectedEventId }
+    }
+
     Surface(
         tonalElevation = 2.dp,
         shape = MaterialTheme.shapes.large,
@@ -255,6 +263,33 @@ private fun DiagnosticsPanel(
                 "Last transition",
                 runtimeState.lastTransitionAtEpochMillis?.let(::formatTimestamp) ?: "No changes",
             )
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Signal history",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            SignalHistoryChart(
+                samples = signalSamples,
+                events = events,
+                selectedEventId = selectedEventId,
+                onEventSelected = { selectedEventId = it.id },
+            )
+            if (selectedEvent == null && signalSamples.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Tap an event marker to inspect what happened at that point in the timeline.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (selectedEvent != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                EventDetailCard(event = selectedEvent)
+            }
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider()
             Spacer(modifier = Modifier.height(12.dp))
@@ -292,6 +327,32 @@ private fun DiagnosticsPanel(
             ) {
                 Text("Hide")
             }
+        }
+    }
+}
+
+@Composable
+private fun EventDetailCard(
+    event: EventLogEntry,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = "Selected event",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            DiagnosticLine("Time", formatTimestamp(event.timestampEpochMillis))
+            DiagnosticLine("Category", event.category)
+            DiagnosticLine("Severity", event.severity)
+            if (!event.ssid.isNullOrBlank()) {
+                DiagnosticLine("Wi-Fi", event.ssid)
+            }
+            Text(
+                text = event.message,
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
     }
 }
