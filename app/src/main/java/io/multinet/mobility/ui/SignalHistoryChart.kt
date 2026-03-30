@@ -65,17 +65,19 @@ fun SignalHistoryChart(
     val thresholdColor = MaterialTheme.colorScheme.tertiary
     val signalColor = MaterialTheme.colorScheme.primary
     val scrollState = rememberScrollState()
-    Column {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth(),
-        ) {
-            val chartWidth = remember(maxWidth, chartModel.samples.size) {
-                maxOf(
-                    maxWidth,
-                    minChartWidth(sampleCount = chartModel.samples.size),
-                )
-            }
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth(),
+    ) {
+        val chartWidth = remember(maxWidth, chartModel.samples.size) {
+            maxOf(
+                maxWidth,
+                minChartWidth(sampleCount = chartModel.samples.size),
+            )
+        }
+        val showScrollHint = chartWidth > maxWidth
+
+        Column {
             val widthPx = with(density) { chartWidth.toPx() }
             val heightPx = with(density) { 220.dp.toPx() }
             val markerRadiusPx = with(density) { 6.dp.toPx() }
@@ -171,7 +173,7 @@ fun SignalHistoryChart(
                     }
                 }
             }
-            if (chartWidth > maxWidth) {
+            if (showScrollHint) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Scroll horizontally to inspect older samples.",
@@ -179,25 +181,25 @@ fun SignalHistoryChart(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
 
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            LegendItem(label = "Signal", color = signalColor)
-            Spacer(modifier = Modifier.size(12.dp))
-            LegendItem(label = "Warmup threshold", color = thresholdColor)
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            LegendItem(label = "Info event", color = markerColor(severity = "INFO", selected = false))
-            Spacer(modifier = Modifier.size(12.dp))
-            LegendItem(label = "Warning event", color = markerColor(severity = "WARN", selected = false))
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            LegendItem(label = "Error event", color = markerColor(severity = "ERROR", selected = false))
-            Spacer(modifier = Modifier.size(12.dp))
-            LegendItem(label = "Selected", color = markerColor(severity = "INFO", selected = true))
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LegendItem(label = "Signal", color = signalColor)
+                Spacer(modifier = Modifier.size(12.dp))
+                LegendItem(label = "Warmup threshold", color = thresholdColor)
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LegendItem(label = "Info event", color = markerColor(severity = "INFO", selected = false))
+                Spacer(modifier = Modifier.size(12.dp))
+                LegendItem(label = "Warning event", color = markerColor(severity = "WARN", selected = false))
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LegendItem(label = "Error event", color = markerColor(severity = "ERROR", selected = false))
+                Spacer(modifier = Modifier.size(12.dp))
+                LegendItem(label = "Selected", color = markerColor(severity = "INFO", selected = true))
+            }
         }
     }
 }
