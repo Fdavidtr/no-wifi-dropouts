@@ -37,8 +37,7 @@ class ContinuityController @Inject constructor(
     private var monitorJob: Job? = null
     private var lastDecisionLogKey: String? = null
     private var lastWarmupState: CellularWarmupState? = null
-    private var lastSignalSampleAtEpochMillis: Long? = null
-    private var lastSignalSampleSignature: String? = null
+    private var signalSampleState = SignalSampleState()
 
     private val _runtimeState = MutableStateFlow(
         ContinuityRuntimeState(
@@ -114,8 +113,7 @@ class ContinuityController @Inject constructor(
         connectivityRepository.stopMonitoring()
         lastDecisionLogKey = null
         lastWarmupState = CellularWarmupState.IDLE
-        lastSignalSampleAtEpochMillis = null
-        lastSignalSampleSignature = null
+        signalSampleState = SignalSampleState()
         _runtimeState.update { current ->
             current.copy(
                 modeEnabled = false,
@@ -133,78 +131,32 @@ class ContinuityController @Inject constructor(
     }
 
     private suspend fun recordSignalSampleIfNeeded(snapshot: ConnectivitySnapshot) {
-        val rssi = snapshot.rssi ?: return
-        val thresholdRssi = WifiSignalBucket.weakThresholdRssi(snapshot) ?: return
-        val sampleTimestamp = snapshot.updatedAtEpochMillis
-        val signature = listOf(
-            snapshot.currentNetworkId.orEmpty(),
-            rssi.toString(),
-            thresholdRssi.toString(),
-            snapshot.validated.toString(),
-        ).joinToString("|")
+        val decision = ContinuityDiagnosticsLogic.evaluateSignalSample(
+            snapshot = snapshot,
+            previousState = signalSampleState,
+        )
+        signalSampleState = decision.updatedState
 
-        val shouldRecord = when {
-            lastSignalSampleAtEpochMillis == null -> true
-            lastSignalSampleSignature != signature -> true
-            sampleTimestamp - (lastSignalSampleAtEpochMillis ?: 0L) >= SIGNAL_SAMPLE_INTERVAL_MILLIS -> true
-            else -> false
-        }
-
-        if (!shouldRecord) return
+        if (!decision.shouldRecord) return
 
         signalHistoryRepository.record(
             snapshot = snapshot,
-            thresholdRssi = thresholdRssi,
-            bucket = WifiSignalBucket.fromSnapshot(snapshot),
+            thresholdRssi = checkNotNull(decision.thresholdRssi),
+            bucket = decision.bucket,
         )
-        lastSignalSampleAtEpochMillis = sampleTimestamp
-        lastSignalSampleSignature = signature
     }
 
     private suspend fun logNetworkTransitionIfNeeded(snapshot: ConnectivitySnapshot) {
-        val previous = _runtimeState.value.snapshot
-        if (
-            previous.defaultTransport == snapshot.defaultTransport &&
-            previous.currentNetworkId == snapshot.currentNetworkId
-        ) {
-            return
-        }
-
-        val message = when {
-            snapshot.defaultTransport == io.multinet.mobility.domain.TransportType.CELLULAR -> {
-                "Default network switched to mobile data."
-            }
-
-            snapshot.defaultTransport == io.multinet.mobility.domain.TransportType.WIFI &&
-                previous.defaultTransport != io.multinet.mobility.domain.TransportType.WIFI -> {
-                snapshot.wifiSsid?.let { "Default network switched to Wi-Fi ($it)." }
-                    ?: "Default network switched to Wi-Fi."
-            }
-
-            snapshot.defaultTransport == io.multinet.mobility.domain.TransportType.WIFI &&
-                previous.currentNetworkId != snapshot.currentNetworkId -> {
-                snapshot.wifiSsid?.let { "Wi-Fi network changed to $it." }
-                    ?: "Wi-Fi network changed."
-            }
-
-            snapshot.defaultTransport == io.multinet.mobility.domain.TransportType.NONE -> {
-                "No default network is available."
-            }
-
-            else -> {
-                "Default network changed to ${snapshot.defaultTransport.name.lowercase()}."
-            }
-        }
+        val logEvent = ContinuityDiagnosticsLogic.buildNetworkTransitionLogEvent(
+            previous = _runtimeState.value.snapshot,
+            current = snapshot,
+        ) ?: return
 
         eventLogRepository.log(
             category = "network_transition",
-            message = message,
-            severity = if (snapshot.defaultTransport == io.multinet.mobility.domain.TransportType.NONE) {
-                "WARN"
-            } else {
-                "INFO"
-            },
-            ssid = snapshot.wifiSsid,
+            message = logEvent.message,
+            severity = logEvent.severity,
+            ssid = logEvent.ssid,
         )
     }
 
@@ -337,7 +289,4 @@ class ContinuityController @Inject constructor(
         }
     }
 
-    private companion object {
-        private const val SIGNAL_SAMPLE_INTERVAL_MILLIS = 5_000L
-    }
 }
