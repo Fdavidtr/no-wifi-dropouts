@@ -68,6 +68,16 @@ Local validation completed:
 ./gradlew assembleDebug
 ```
 
+## Beta releases
+
+Beta debug releases can be published from Git tags in the form:
+
+```bash
+v0.1.0-beta.1
+```
+
+The GitHub workflow uses the tag version as the Android `versionName`, builds the debug APK, and publishes it as a GitHub prerelease asset so it can be downloaded directly from the Releases page.
+
 It was also tested on my own Android phone. The improvement was limited, which ended up being one of the main takeaways of the project: Android puts real constraints on how much a normal app can influence Wi-Fi-to-mobile fallback behavior.
 
 That was still valuable. The project worked well as a learning exercise in Android connectivity, system callbacks, foreground services, permissions, and the practical limits of public networking APIs.

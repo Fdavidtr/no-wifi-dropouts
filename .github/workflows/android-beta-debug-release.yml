@@ -1,0 +1,64 @@
+name: Android Beta Debug Release
+
+on:
+  push:
+    tags:
+      - 'v*-beta.*'
+
+permissions:
+  contents: write
+
+jobs:
+  beta-debug-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Derive beta version
+        id: beta_version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "apk_name=no-wifi-dropouts-${VERSION}-debug.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Build debug APK
+        run: >
+          ./gradlew assembleDebug
+          -PappVersionName=${{ steps.beta_version.outputs.version }}
+          -PappVersionCode=${{ steps.beta_version.outputs.version_code }}
+
+      - name: Rename debug APK for release
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk "dist/${{ steps.beta_version.outputs.apk_name }}"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.beta_version.outputs.apk_name }}
+          path: dist/${{ steps.beta_version.outputs.apk_name }}
+          if-no-files-found: error
+
+      - name: Publish beta prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Beta ${{ steps.beta_version.outputs.version }}
+          prerelease: true
+          files: dist/${{ steps.beta_version.outputs.apk_name }}
+          generate_release_notes: true
