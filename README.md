@@ -2,7 +2,7 @@
 
 Android app that tries to reduce Wi-Fi dropouts by warming up mobile data when Wi-Fi starts to degrade.
 
-The idea is simple: keep the product honest, local, and narrow. This is not a VPN, not bonding, and not a fake "magic internet" demo. It is a native Android experiment focused on one thing: making fallback from weak Wi-Fi to mobile data faster and more predictable.
+This is not a VPN, not bonding, and not a fake "magic internet" demo. It is a native Android experiment focused on one thing: making fallback from weak Wi-Fi to mobile data faster and more predictable.
 
 ## What it does
 
