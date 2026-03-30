@@ -236,7 +236,7 @@ private fun DiagnosticsPanel(
     signalSamples: List<SignalSampleEntry>,
     onHide: () -> Unit,
 ) {
-    var selectedEventId by rememberSaveable(events) { mutableStateOf<Long?>(null) }
+    var selectedEventId by rememberSaveable { mutableStateOf<Long?>(null) }
     val selectedEvent = remember(selectedEventId, events) {
         events.firstOrNull { it.id == selectedEventId }
     }
