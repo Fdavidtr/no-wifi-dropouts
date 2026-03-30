@@ -54,16 +54,20 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk "dist/$APK_NAME"
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.beta_version.outputs.apk_name }}
           path: dist/${{ steps.beta_version.outputs.apk_name }}
           if-no-files-found: error
 
       - name: Publish beta prerelease
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Beta ${{ steps.beta_version.outputs.version }}
-          prerelease: true
-          files: dist/${{ steps.beta_version.outputs.apk_name }}
-          generate_release_notes: true
+        env:
+          APK_NAME: ${{ steps.beta_version.outputs.apk_name }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.beta_version.outputs.version }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" "dist/$APK_NAME"
+          --verify-tag
+          --title "Beta $VERSION"
+          --prerelease
+          --generate-notes
