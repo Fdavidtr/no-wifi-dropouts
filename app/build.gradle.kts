@@ -7,6 +7,15 @@ plugins {
     alias(libs.plugins.protobuf)
 }
 
+val configuredVersionCode = providers.gradleProperty("appVersionCode")
+    .map(String::toInt)
+    .orElse(1)
+    .get()
+
+val configuredVersionName = providers.gradleProperty("appVersionName")
+    .orElse("0.1.0")
+    .get()
+
 android {
     namespace = "io.multinet.mobility"
     compileSdk = 36
@@ -15,8 +24,8 @@ android {
         applicationId = "io.multinet.mobility"
         minSdk = 31
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = configuredVersionCode
+        versionName = configuredVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
