@@ -5,11 +5,11 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,10 +36,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -48,9 +48,12 @@ import io.multinet.mobility.data.db.EventLogEntry
 import io.multinet.mobility.data.db.SignalSampleEntry
 import io.multinet.mobility.domain.CellularWarmupState
 import io.multinet.mobility.domain.ContinuityRuntimeState
+import io.multinet.mobility.domain.ContinuitySettingsState
 import io.multinet.mobility.domain.ConnectivitySnapshot
 import io.multinet.mobility.domain.TransportType
+import io.multinet.mobility.domain.WifiSignalBucket
 import io.multinet.mobility.service.ContinuityService
+import io.multinet.mobility.ui.theme.MultiNetTheme
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -108,6 +111,43 @@ fun MultiNetApp(
         buildNetworkLine(uiState.runtime.snapshot)
     }
 
+    MultiNetScreen(
+        uiState = uiState,
+        snackbarHostState = snackbarHostState,
+        allRuntimePermissionsGranted = allRuntimePermissionsGranted,
+        statusLine = statusLine,
+        networkLine = networkLine,
+        onPrimaryAction = {
+            if (uiState.settings.modeEnabled) {
+                ContinuityService.stop(context)
+            } else if (!allRuntimePermissionsGranted) {
+                pendingConnect = true
+                permissionLauncher.launch(runtimePermissions)
+            } else {
+                viewModel.markIntroCompleted()
+                ContinuityService.start(context)
+            }
+        },
+        onToggleDiagnostics = {
+            viewModel.setDiagnosticsUnlocked(!uiState.settings.diagnosticsUnlocked)
+        },
+        onHideDiagnostics = {
+            viewModel.setDiagnosticsUnlocked(false)
+        },
+    )
+}
+
+@Composable
+private fun MultiNetScreen(
+    uiState: MainUiState,
+    snackbarHostState: SnackbarHostState,
+    allRuntimePermissionsGranted: Boolean,
+    statusLine: String,
+    networkLine: String,
+    onPrimaryAction: () -> Unit,
+    onToggleDiagnostics: () -> Unit,
+    onHideDiagnostics: () -> Unit,
+) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
@@ -135,26 +175,12 @@ fun MultiNetApp(
                 StatusCard(
                     statusLine = statusLine,
                     networkLine = networkLine,
-                    diagnosticsUnlocked = uiState.settings.diagnosticsUnlocked,
-                    onUnlockDiagnostics = {
-                        if (!uiState.settings.diagnosticsUnlocked) {
-                            viewModel.setDiagnosticsUnlocked(true)
-                        }
-                    },
+                    diagnosticsVisible = uiState.settings.diagnosticsUnlocked,
+                    onToggleDiagnostics = onToggleDiagnostics,
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(
-                    onClick = {
-                        if (uiState.settings.modeEnabled) {
-                            ContinuityService.stop(context)
-                        } else if (!allRuntimePermissionsGranted) {
-                            pendingConnect = true
-                            permissionLauncher.launch(runtimePermissions)
-                        } else {
-                            viewModel.markIntroCompleted()
-                            ContinuityService.start(context)
-                        }
-                    },
+                    onClick = onPrimaryAction,
                     contentPadding = PaddingValues(horizontal = 48.dp, vertical = 18.dp),
                 ) {
                     Text(
@@ -180,7 +206,7 @@ fun MultiNetApp(
                         runtimeState = uiState.runtime,
                         events = uiState.events,
                         signalSamples = uiState.signalSamples,
-                        onHide = { viewModel.setDiagnosticsUnlocked(false) },
+                        onHide = onHideDiagnostics,
                     )
                 }
             }
@@ -192,21 +218,11 @@ fun MultiNetApp(
 private fun StatusCard(
     statusLine: String,
     networkLine: String,
-    diagnosticsUnlocked: Boolean,
-    onUnlockDiagnostics: () -> Unit,
+    diagnosticsVisible: Boolean,
+    onToggleDiagnostics: () -> Unit,
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .pointerInput(diagnosticsUnlocked) {
-                detectTapGestures(
-                    onLongPress = {
-                        if (!diagnosticsUnlocked) {
-                            onUnlockDiagnostics()
-                        }
-                    },
-                )
-            },
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
@@ -225,6 +241,10 @@ private fun StatusCard(
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(modifier = Modifier.height(12.dp))
+            TextButton(onClick = onToggleDiagnostics) {
+                Text(if (diagnosticsVisible) "Hide diagnostics" else "Show diagnostics")
+            }
         }
     }
 }
@@ -237,6 +257,7 @@ private fun DiagnosticsPanel(
     onHide: () -> Unit,
 ) {
     var selectedEventId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var eventsExpanded by rememberSaveable { mutableStateOf(false) }
     val selectedEvent = remember(selectedEventId, events) {
         events.firstOrNull { it.id == selectedEventId }
     }
@@ -293,30 +314,44 @@ private fun DiagnosticsPanel(
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider()
             Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Recent events",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            if (events.isEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
                 Text(
-                    text = "No events recorded yet.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = "Recent events",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
                 )
-            } else {
-                events.forEach { event ->
-                    Column(modifier = Modifier.padding(vertical = 6.dp)) {
-                        Text(
-                            text = "${formatTimestamp(event.timestampEpochMillis)} · ${event.category}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            text = event.message,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                TextButton(
+                    onClick = { eventsExpanded = !eventsExpanded },
+                    enabled = events.isNotEmpty(),
+                ) {
+                    Text(if (eventsExpanded) "Hide events" else "Show events")
+                }
+            }
+            if (eventsExpanded) {
+                Spacer(modifier = Modifier.height(8.dp))
+                if (events.isEmpty()) {
+                    Text(
+                        text = "No events recorded yet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    events.forEach { event ->
+                        Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                            Text(
+                                text = "${formatTimestamp(event.timestampEpochMillis)} · ${event.category}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                text = event.message,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                     }
                 }
             }
@@ -373,6 +408,159 @@ private fun DiagnosticLine(
             style = MaterialTheme.typography.bodyMedium,
         )
     }
+}
+
+@Preview(showBackground = true, widthDp = 400, heightDp = 900)
+@Composable
+private fun MultiNetScreenPreview() {
+    val previewState = previewUiState()
+
+    MultiNetTheme {
+        MultiNetScreen(
+            uiState = previewState,
+            snackbarHostState = remember { SnackbarHostState() },
+            allRuntimePermissionsGranted = true,
+            statusLine = buildStatusLine(
+                runtimeState = previewState.runtime,
+                modeEnabled = previewState.settings.modeEnabled,
+                allPermissionsGranted = true,
+            ),
+            networkLine = buildNetworkLine(previewState.runtime.snapshot),
+            onPrimaryAction = {},
+            onToggleDiagnostics = {},
+            onHideDiagnostics = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, widthDp = 400, heightDp = 700)
+@Composable
+private fun DiagnosticsPanelPreview() {
+    val previewState = previewUiState()
+
+    MultiNetTheme {
+        DiagnosticsPanel(
+            runtimeState = previewState.runtime,
+            events = previewState.events,
+            signalSamples = previewState.signalSamples,
+            onHide = {},
+        )
+    }
+}
+
+private fun previewUiState(): MainUiState {
+    val baseTime = 1_711_800_000_000L
+    val previewEvents = listOf(
+        EventLogEntry(
+            id = 1,
+            timestampEpochMillis = baseTime + 60_000L,
+            severity = "INFO",
+            category = "continuity_controller",
+            message = "Continuity monitoring started.",
+            ssid = "Home Wi-Fi",
+        ),
+        EventLogEntry(
+            id = 2,
+            timestampEpochMillis = baseTime + 180_000L,
+            severity = "WARN",
+            category = "wifi_signal",
+            message = "Wi-Fi signal dropped below the warmup threshold.",
+            ssid = "Home Wi-Fi",
+        ),
+        EventLogEntry(
+            id = 3,
+            timestampEpochMillis = baseTime + 240_000L,
+            severity = "INFO",
+            category = "network_transition",
+            message = "Default network switched to mobile data.",
+            ssid = "Home Wi-Fi",
+        ),
+    )
+    val previewSamples = listOf(
+        SignalSampleEntry(
+            id = 1,
+            timestampEpochMillis = baseTime,
+            networkId = "wifi-home",
+            ssid = "Home Wi-Fi",
+            rssi = -67,
+            thresholdRssi = -78,
+            frequencyMhz = 5180,
+            bucket = WifiSignalBucket.GOOD.name,
+            validated = true,
+        ),
+        SignalSampleEntry(
+            id = 2,
+            timestampEpochMillis = baseTime + 60_000L,
+            networkId = "wifi-home",
+            ssid = "Home Wi-Fi",
+            rssi = -71,
+            thresholdRssi = -78,
+            frequencyMhz = 5180,
+            bucket = WifiSignalBucket.GOOD.name,
+            validated = true,
+        ),
+        SignalSampleEntry(
+            id = 3,
+            timestampEpochMillis = baseTime + 120_000L,
+            networkId = "wifi-home",
+            ssid = "Home Wi-Fi",
+            rssi = -77,
+            thresholdRssi = -78,
+            frequencyMhz = 5180,
+            bucket = WifiSignalBucket.WEAK.name,
+            validated = true,
+        ),
+        SignalSampleEntry(
+            id = 4,
+            timestampEpochMillis = baseTime + 180_000L,
+            networkId = "wifi-home",
+            ssid = "Home Wi-Fi",
+            rssi = -82,
+            thresholdRssi = -78,
+            frequencyMhz = 5180,
+            bucket = WifiSignalBucket.CRITICAL.name,
+            validated = false,
+        ),
+        SignalSampleEntry(
+            id = 5,
+            timestampEpochMillis = baseTime + 240_000L,
+            networkId = "wifi-home",
+            ssid = "Home Wi-Fi",
+            rssi = -84,
+            thresholdRssi = -78,
+            frequencyMhz = 5180,
+            bucket = WifiSignalBucket.CRITICAL.name,
+            validated = false,
+        ),
+    )
+
+    return MainUiState(
+        settings = ContinuitySettingsState(
+            modeEnabled = true,
+            introCompleted = true,
+            diagnosticsUnlocked = true,
+        ),
+        runtime = ContinuityRuntimeState(
+            modeEnabled = true,
+            isMonitoring = true,
+            snapshot = ConnectivitySnapshot(
+                currentNetworkId = "cellular-fallback",
+                defaultTransport = TransportType.CELLULAR,
+                validated = true,
+                internetAvailable = true,
+                wifiSsid = "Home Wi-Fi",
+                rssi = -84,
+                frequencyMhz = 5180,
+                updatedAtEpochMillis = baseTime + 240_000L,
+            ),
+            wifiSignalBucket = WifiSignalBucket.CRITICAL,
+            cellularAvailable = true,
+            cellularWarmupState = CellularWarmupState.AVAILABLE,
+            lastTransitionAtEpochMillis = baseTime + 240_000L,
+        ),
+        events = previewEvents,
+        signalSamples = previewSamples,
+    )
 }
 
 private fun buildStatusLine(

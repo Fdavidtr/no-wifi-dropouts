@@ -68,6 +68,22 @@ Local validation completed:
 ./gradlew assembleDebug
 ```
 
+## UI preview workflow
+
+There is no project-level hot-reload command comparable to `npm run dev`.
+
+For fast UI iteration:
+
+- open the project in Android Studio
+- use Compose Preview on `MultiNetScreenPreview` or `DiagnosticsPanelPreview` in `app/src/main/java/io/multinet/mobility/ui/MultiNetApp.kt`
+- use Live Edit with a running emulator or device for supported Compose changes
+
+For deploy-based iteration from the terminal:
+
+```bash
+./gradlew installDebug
+```
+
 ## Beta releases
 
 Beta debug releases can be published from Git tags in the form:

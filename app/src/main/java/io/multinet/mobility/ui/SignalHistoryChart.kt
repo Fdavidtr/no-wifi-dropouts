@@ -148,27 +148,38 @@ fun SignalHistoryChart(
 
         Spacer(modifier = Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            LegendDot(color = signalColor)
-            Text(
-                text = "Signal",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            LegendItem(label = "Signal", color = signalColor)
             Spacer(modifier = Modifier.size(12.dp))
-            LegendDot(color = thresholdColor)
-            Text(
-                text = "Warmup threshold",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.size(12.dp))
-            LegendDot(color = MaterialTheme.colorScheme.error)
-            Text(
-                text = "Event",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            LegendItem(label = "Warmup threshold", color = thresholdColor)
         }
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            LegendItem(label = "Info event", color = markerColor(severity = "INFO", selected = false))
+            Spacer(modifier = Modifier.size(12.dp))
+            LegendItem(label = "Warning event", color = markerColor(severity = "WARN", selected = false))
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            LegendItem(label = "Error event", color = markerColor(severity = "ERROR", selected = false))
+            Spacer(modifier = Modifier.size(12.dp))
+            LegendItem(label = "Selected", color = markerColor(severity = "INFO", selected = true))
+        }
+    }
+}
+
+@Composable
+private fun LegendItem(
+    label: String,
+    color: Color,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        LegendDot(color = color)
+        Spacer(modifier = Modifier.size(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
